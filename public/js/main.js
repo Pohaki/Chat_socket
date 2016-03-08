@@ -8,6 +8,7 @@ $(function() {
   ];
 
   // Initialize variables
+  var localStream, localPeerConnection, remotePeerConnection;
   var $window = $(window);
   var $usernameInput = $('.usernameInput'); // Input for username
   var $messages = $('.messages'); // Messages area
@@ -16,8 +17,34 @@ $(function() {
   var $loginPage = $('.login.page'); // The login page
   var $chatPage = $('.chat.page'); // The chatroom page
 
+  var startButton = document.getElementById('startButton');
+  var callButton = document.getElementById('callButton');
+  var hangupButton = document.getElementById('hangupButton');
+  callButton.disabled = true;
+  hangupButton.disabled = true;
+  startButton.onclick = start;
+  callButton.onclick = call;
+  hangupButton.onclick = hangup;
+
+  var video1 = document.querySelector('video#video1');
+  var video2 = document.querySelector('video#video2');
+  var video3 = document.querySelector('video#video3');
+  var video4 = document.querySelector('video#video4');
+
+  var pc1Local;
+  var pc1Remote;
+  var pc2Local;
+  var pc2Remote;
+  var pc3Local;
+  var pc3Remote;
+  var offerOptions = {
+    offerToReceiveAudio: 1,
+    offerToReceiveVideo: 1
+  };
+
   // Prompt for setting a username
   var username;
+  var rooms = ['room1', 'room2', 'room3'];
   var connected = false;
   var typing = false;
   var lastTypingTime;
@@ -30,12 +57,204 @@ $(function() {
     if (data.numUsers === 1) {
       message += "there's 1 participant";
     } else {
-      message += "there are " + data.numUsers + " participants in " + data.rooms;
+      console.log(data.room);
+      message += "there are " + data.numUsers + " participants in " + data.room;
     }
-      console.log(data);
     log(message);
   }
 
+  // Video connection 3 participants
+  function gotStream(stream) {
+    trace('Received local stream');
+    video1.srcObject = stream;
+    window.localstream = stream;
+    callButton.disabled = false;
+  }
+
+  function start() {
+    trace('Requesting local stream');
+    startButton.disabled = true;
+    navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: true
+    })
+    .then(gotStream)
+    .catch(function(e) {
+      console.log('getUserMedia() error: ', e);
+    });
+  }
+  function call() {
+    callButton.disabled = true;
+    hangupButton.disabled = false;
+    trace('Starting calls');
+    var audioTracks = window.localstream.getAudioTracks();
+    var videoTracks = window.localstream.getVideoTracks();
+    if (audioTracks.length > 0) {
+      trace('Using audio device: ' + audioTracks[0].label);
+    }
+    if (videoTracks.length > 0) {
+      trace('Using video device: ' + videoTracks[0].label);
+    }
+    // Create an RTCPeerConnection via the polyfill.
+    var servers = null;
+    pc1Local = new RTCPeerConnection(servers);
+    pc1Remote = new RTCPeerConnection(servers);
+    pc1Remote.onaddstream = gotRemoteStream1;
+    pc1Local.onicecandidate = iceCallback1Local;
+    pc1Remote.onicecandidate = iceCallback1Remote;
+    trace('pc1: created local and remote peer connection objects');
+
+    pc2Local = new RTCPeerConnection(servers);
+    pc2Remote = new RTCPeerConnection(servers);
+    pc2Remote.onaddstream = gotRemoteStream2;
+    pc2Local.onicecandidate = iceCallback2Local;
+    pc2Remote.onicecandidate = iceCallback2Remote;
+    trace('pc2: created local and remote peer connection objects');
+
+    pc3Local = new RTCPeerConnection(servers);
+    pc3Remote = new RTCPeerConnection(servers);
+    pc3Remote.onaddstream = gotRemoteStream3;
+    pc3Local.onicecandidate = iceCallback3Local;
+    pc3Remote.onicecandidate = iceCallback3Remote;
+    trace('pc3: created local and remote peer connection objects');
+
+    pc1Local.addStream(window.localstream);
+    trace('Adding local stream to pc1Local');
+    pc1Local.createOffer(gotDescription1Local, onCreateSessionDescriptionError,
+        offerOptions);
+
+    pc2Local.addStream(window.localstream);
+    trace('Adding local stream to pc2Local');
+    pc2Local.createOffer(gotDescription2Local, onCreateSessionDescriptionError,
+        offerOptions);
+
+    pc3Local.addStream(window.localstream);
+    trace('Adding local stream to pc3Local');
+    pc3Local.createOffer(gotDescription3Local, onCreateSessionDescriptionError,
+        offerOptions);
+  }
+  function onCreateSessionDescriptionError(error) {
+    trace('Failed to create session description: ' + error.toString());
+  }
+
+  function gotDescription1Local(desc) {
+    pc1Local.setLocalDescription(desc);
+    trace('Offer from pc1Local \n' + desc.sdp);
+    pc1Remote.setRemoteDescription(desc);
+    // Since the 'remote' side has no media stream we need
+    // to pass in the right constraints in order for it to
+    // accept the incoming offer of audio and video.
+    pc1Remote.createAnswer(gotDescription1Remote,
+        onCreateSessionDescriptionError);
+  }
+  function gotDescription1Remote(desc) {
+    pc1Remote.setLocalDescription(desc);
+    trace('Answer from pc1Remote \n' + desc.sdp);
+    pc1Local.setRemoteDescription(desc);
+  }
+
+  function gotDescription2Local(desc) {
+    pc2Local.setLocalDescription(desc);
+    trace('Offer from pc2Local \n' + desc.sdp);
+    pc2Remote.setRemoteDescription(desc);
+    // Since the 'remote' side has no media stream we need
+    // to pass in the right constraints in order for it to
+    // accept the incoming offer of audio and video.
+    pc2Remote.createAnswer(gotDescription2Remote,
+        onCreateSessionDescriptionError);
+  }
+
+  function gotDescription2Remote(desc) {
+    pc2Remote.setLocalDescription(desc);
+    trace('Answer from pc2Remote \n' + desc.sdp);
+    pc2Local.setRemoteDescription(desc);
+  }
+  function gotDescription3Local(desc) {
+    pc3Local.setLocalDescription(desc);
+    trace('Offer from pc2Local \n' + desc.sdp);
+    pc3Remote.setRemoteDescription(desc);
+    // Since the 'remote' side has no media stream we need
+    // to pass in the right constraints in order for it to
+    // accept the incoming offer of audio and video.
+    pc3Remote.createAnswer(gotDescription3Remote,
+        onCreateSessionDescriptionError);
+  }
+
+  function gotDescription3Remote(desc) {
+    pc3Remote.setLocalDescription(desc);
+    trace('Answer from pc2Remote \n' + desc.sdp);
+    pc3Local.setRemoteDescription(desc);
+  }
+
+  function hangup() {
+    trace('Ending calls');
+    pc1Local.close();
+    pc1Remote.close();
+    pc2Local.close();
+    pc2Remote.close();
+    pc3Local.close();
+    pc3Remote.close();
+    pc1Local = pc1Remote = null;
+    pc2Local = pc2Remote = null;
+    pc3Local = pc3Remote = null;
+    hangupButton.disabled = true;
+    callButton.disabled = false;
+  }
+
+  function gotRemoteStream1(e) {
+    video2.srcObject = e.stream;
+    trace('pc1: received remote stream');
+  }
+
+  function gotRemoteStream2(e) {
+    video3.srcObject = e.stream;
+    trace('pc2: received remote stream');
+  }
+
+  function gotRemoteStream3(e) {
+    video4.srcObject = e.stream;
+    trace('pc2: received remote stream');
+  }
+
+  function iceCallback1Local(event) {
+    handleCandidate(event.candidate, pc1Remote, 'pc1: ', 'local');
+  }
+
+  function iceCallback1Remote(event) {
+    handleCandidate(event.candidate, pc1Local, 'pc1: ', 'remote');
+  }
+
+  function iceCallback2Local(event) {
+    handleCandidate(event.candidate, pc2Remote, 'pc2: ', 'local');
+  }
+
+  function iceCallback2Remote(event) {
+    handleCandidate(event.candidate, pc2Local, 'pc2: ', 'remote');
+  }
+
+  function iceCallback3Local(event) {
+    handleCandidate(event.candidate, pc3Remote, 'pc3: ', 'local');
+  }
+
+  function iceCallback3Remote(event) {
+    handleCandidate(event.candidate, pc3Local, 'pc3: ', 'remote');
+  }
+
+  function handleCandidate(candidate, dest, prefix, type) {
+    if (candidate) {
+      dest.addIceCandidate(new RTCIceCandidate(candidate),
+          onAddIceCandidateSuccess, onAddIceCandidateError);
+      trace(prefix + 'New ' + type + ' ICE candidate: ' + candidate.candidate);
+    }
+  }
+
+  function onAddIceCandidateSuccess() {
+    trace('AddIceCandidate success.');
+  }
+
+  function onAddIceCandidateError(error) {
+    trace('Failed to add ICE candidate: ' + error.toString());
+  }
   // Sets the client's username
   function setUsername() {
     username = cleanInput($usernameInput.val().trim());
@@ -190,9 +409,9 @@ $(function() {
   }
   // Switch room
   function switchRoom(room) {
-      socket.emit('switchRoom', room);
-      console.log(room);
-    }
+    socket.emit('switchRoom', room);
+    console.log(room);
+  }
   // Keyboard events
 
   $window.keydown(function(event) {
@@ -211,7 +430,19 @@ $(function() {
       }
     }
   });
+  $usernameInput.on('input', function() {
+    trace();
+    gotStream();
+    getMedia();
+    video();
+    gotLocalDescription();
+    gotRemoteDescription();
+    gotRemoteStream();
+    gotLocalIceCandidate();
+    gotRemoteIceCandidate();
+    handleError();
 
+  });
   $inputMessage.on('input', function() {
     updateTyping();
   });
@@ -269,15 +500,15 @@ $(function() {
     removeChatTyping(data);
   });
   // Whenever the server emits 'update rooms' switch room
-  socket.on('update rooms', function(rooms, current_room) {
+  socket.on('update rooms', function(data) {
     $('#rooms').empty();
-    $.each(rooms, function(key, value) {
-      if (value == current_room) {
+    $.each(data[rooms], function(key, value) {
+      if (value == data[current_room]) {
         $('#rooms').append('<div>' + value + '</div>');
       } else {
         $('#rooms').append('<div><a href="#" onclick="switchRoom(\'' + value + '\')">' + value + '</a></div>');
       }
     });
-    console.log(rooms, current_room);
+    console.log(data.rooms, data.current_room);
   });
 });

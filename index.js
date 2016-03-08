@@ -1,6 +1,7 @@
 // Setup basic express server
 var express = require('express');
 var app = express();
+var Firebase = require("firebase");
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 

@@ -1,12 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
   <title>Chat Albert Learning Test</title>
   <link rel="stylesheet" type="text/css" href="css/style.css">
 </head>
 <body>
-  <ul class="pages">
+  <div class="videos">
+    <video id="video1" autoplay></video>
+    <video id="video2" autoplay></video>
+    <video id="video3" autoplay></video>
+    <video id="video4" autoplay></video>
+  </div>
+  <div class="button">
+    <button id="startButton">Start</button>
+    <button id="callButton">Call</button>
+    <button id="hangupButton">Hang Up</button>
+  </div>
+  <ul id="chat">
     <li class="chat page">
       <div class="chatArea">
         <ul class="messages"></ul>
@@ -21,6 +32,7 @@
     </li>
   </ul>
 
+  <script src="js/adapter.js"></script>
   <script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="js/main.js"></script>

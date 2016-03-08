@@ -2,7 +2,7 @@
   "name": "chat-socket",
   "version": "0.0.2",
   "description": "chat realtime with other in a room",
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.13.4",
+    "firebase": "^2.4.1",
     "socket.io": "^1.4.5"
   },
   "engines": {
